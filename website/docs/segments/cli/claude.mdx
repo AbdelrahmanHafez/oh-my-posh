@@ -52,7 +52,7 @@ import Config from "@site/src/components/Config.js";
 | ----------------------- | --------------- | ------------------------------------------------------------------------------------ |
 | `.CWD`                  | `string`        | Current working directory; same value as `.Workspace.CurrentDir`                     |
 | `.SessionID`            | `string`        | Unique identifier for the Claude session                                             |
-| `.SessionName`          | `string`        | Custom session name; empty when absent                                               |
+| `.SessionName`          | `string`        | Custom name or AI-generated title; empty when neither exists                         |
 | `.PromptID`             | `string`        | User prompt identifier for event correlation; empty when absent                      |
 | `.TranscriptPath`       | `string`        | Path to the conversation transcript file                                             |
 | `.Model`                | `Model`         | AI model information                                                                 |
@@ -68,7 +68,7 @@ import Config from "@site/src/components/Config.js";
 | `.Agent`                | `Agent`         | Agent information; nil when absent                                                   |
 | `.PR`                   | `PR`            | Pull request information for the current branch; nil when absent                     |
 | `.Worktree`             | `Worktree`      | Claude Code worktree information; nil when absent                                    |
-| `.FastMode`             | `bool`          | Whether fast mode is enabled; `false` when absent or unsupported                     |
+| `.FastMode`             | `bool`          | Whether fast mode is enabled; `false` when absent                                    |
 | `.TokenUsagePercent`    | `Percentage`    | Percentage of context window used (0-100)                                            |
 | `.TokenGauge`           | `string`        | Gauge showing remaining context capacity using configured characters (e.g., `▰▰▰▱▱`) |
 | `.TokenGaugeUsed`       | `string`        | Gauge showing used context capacity using configured characters (e.g., `▰▰▱▱▱`)      |
@@ -168,7 +168,7 @@ are all `nil` when the underlying data is absent. Guard direct field access with
 
 | Name                  | Type         | Description                                                 |
 | --------------------- | ------------ | ----------------------------------------------------------- |
-| `.TotalCostUSD`       | `float64`    | Total cost in USD                                           |
+| `.TotalCostUSD`       | `float64`    | Estimated session cost in USD; resets to zero after `/clear` |
 | `.TotalDurationMS`    | `DurationMS` | Total session duration in milliseconds (formats as "Xm Ys") |
 | `.TotalAPIDurationMS` | `DurationMS` | Time spent waiting for API responses (formats as "Xm Ys")   |
 | `.TotalLinesAdded`    | `int`        | Lines of code added in the session                          |
