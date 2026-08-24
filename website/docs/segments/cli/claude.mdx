@@ -52,7 +52,7 @@ import Config from "@site/src/components/Config.js";
 | ----------------------- | --------------- | ------------------------------------------------------------------------------------ |
 | `.CWD`                  | `string`        | Current working directory; same value as `.Workspace.CurrentDir`                     |
 | `.SessionID`            | `string`        | Unique identifier for the Claude session                                             |
-| `.SessionName`          | `string`        | Custom session name; empty when absent                                               |
+| `.SessionName`          | `string`        | Custom name or AI-generated title; empty when neither exists                         |
 | `.PromptID`             | `string`        | User prompt identifier for event correlation; empty when absent                      |
 | `.TranscriptPath`       | `string`        | Path to the conversation transcript file                                             |
 | `.Model`                | `Model`         | AI model information                                                                 |
@@ -63,12 +63,13 @@ import Config from "@site/src/components/Config.js";
 | `.Thinking`             | `Thinking`      | Extended thinking state; nil when absent                                            |
 | `.Cost`                 | `Cost`          | Cost and duration information                                                        |
 | `.ContextWindow`        | `ContextWindow` | Token usage information                                                              |
+| `.RateLimits`           | `RateLimits`    | Rate limit data for Claude.ai subscribers; nil when unavailable                      |
 | `.Exceeds200KTokens`    | `bool`          | Whether the most recent API response exceeded 200K total tokens                      |
 | `.Vim`                  | `Vim`           | Vim mode information; nil when absent                                                |
 | `.Agent`                | `Agent`         | Agent information; nil when absent                                                   |
-| `.PR`                   | `PR`            | Pull request information for the current branch; nil when absent                     |
+| `.PR`                   | `PR`            | Pull request or GitLab merge request information; nil when absent                    |
 | `.Worktree`             | `Worktree`      | Claude Code worktree information; nil when absent                                    |
-| `.FastMode`             | `bool`          | Whether fast mode is enabled; `false` when absent or unsupported                     |
+| `.FastMode`             | `bool`          | Whether fast mode is enabled; `false` when absent                                    |
 | `.TokenUsagePercent`    | `Percentage`    | Percentage of context window used (0-100)                                            |
 | `.TokenGauge`           | `string`        | Gauge showing remaining context capacity using configured characters (e.g., `▰▰▰▱▱`) |
 | `.TokenGaugeUsed`       | `string`        | Gauge showing used context capacity using configured characters (e.g., `▰▰▱▱▱`)      |
@@ -99,7 +100,7 @@ import Config from "@site/src/components/Config.js";
 | `.CurrentDir`  | `string`   | Current working directory; same value as `.CWD`                              |
 | `.ProjectDir`  | `string`   | Directory where Claude Code was launched; may differ from `.CurrentDir`      |
 | `.AddedDirs`   | `[]string` | Additional directories added via `/add-dir` or `--add-dir`                   |
-| `.GitWorktree` | `string`   | Path to the linked git worktree, empty when not inside a linked git worktree |
+| `.GitWorktree` | `string`   | Linked git worktree name; empty in the main working tree                     |
 | `.Repo`        | `Repo`     | Repository identity parsed from the `origin` remote; nil when absent         |
 
 #### Repo Properties
@@ -111,9 +112,9 @@ import Config from "@site/src/components/Config.js";
 | `.Name`  | `string` | Repository name; empty when absent                           |
 
 :::tip nil pointer fields
-`.OutputStyle`, `.Effort`, `.Thinking`, `.Vim`, `.Agent`, `.PR`, `.Worktree`, and `.Workspace.Repo`
-are all `nil` when the underlying data is absent. Guard direct field access with
-`{{if .Effort}}{{.Effort.Level}}{{end}}` to avoid template errors.
+`.OutputStyle`, `.Effort`, `.Thinking`, `.Vim`, `.Agent`, `.PR`, `.Worktree`, and `.RateLimits` are `nil` when the
+underlying data is absent. The same applies to `.Workspace.Repo`, `.ContextWindow.CurrentUsage`, and each rate limit
+window. Guard direct field access with `{{if .Effort}}{{.Effort.Level}}{{end}}` to avoid template errors.
 :::
 
 #### OutputStyle Properties
@@ -148,11 +149,16 @@ are all `nil` when the underlying data is absent. Guard direct field access with
 
 #### PR Properties
 
-| Name           | Type          | Description                                                                                   |
-| -------------- | ------------- | --------------------------------------------------------------------------------------------- |
-| `.Number`      | `string`      | Open pull request number for the current branch; empty when absent                            |
-| `.URL`         | `string`      | Open pull request URL for the current branch; empty when absent                               |
-| `.ReviewState` | `string`      | Review status (`approved`, `pending`, `changes_requested`, or `draft`); empty when unavailable |
+| Name           | Type     | Description                                                  |
+| -------------- | -------- | ------------------------------------------------------------ |
+| `.Number`      | `string` | Review item number for the current branch; empty when absent |
+| `.URL`         | `string` | Review item URL for the current branch; empty when absent    |
+| `.ReviewState` | `string` | Review status; empty when unavailable                        |
+| `.Kind`        | `string` | Review kind; `mr` for GitLab and empty for GitHub            |
+
+For GitLab merge requests, `.ReviewState` uses different rules. It is `approved` when GitLab reports the MR as
+mergeable. It is `draft` for a draft MR, and `pending` for other open states. GitLab MR data requires Claude Code
+2.1.234 or later.
 
 #### Worktree Properties
 
@@ -166,45 +172,49 @@ are all `nil` when the underlying data is absent. Guard direct field access with
 
 #### Cost Properties
 
-| Name                  | Type         | Description                                                 |
-| --------------------- | ------------ | ----------------------------------------------------------- |
-| `.TotalCostUSD`       | `float64`    | Total cost in USD                                           |
-| `.TotalDurationMS`    | `DurationMS` | Total session duration in milliseconds (formats as "Xm Ys") |
-| `.TotalAPIDurationMS` | `DurationMS` | Time spent waiting for API responses (formats as "Xm Ys")   |
-| `.TotalLinesAdded`    | `int`        | Lines of code added in the session                          |
-| `.TotalLinesRemoved`  | `int`        | Lines of code removed in the session                        |
+| Name                  | Type         | Description                                                  |
+| --------------------- | ------------ | ------------------------------------------------------------ |
+| `.TotalCostUSD`       | `float64`    | Estimated session cost in USD; resets to zero after `/clear` |
+| `.TotalDurationMS`    | `string`     | Total session duration in milliseconds (formats as "Xm Ys")  |
+| `.TotalAPIDurationMS` | `string`     | Time spent waiting for API responses (formats as "Xm Ys")    |
+| `.TotalLinesAdded`    | `int`        | Lines of code added in the session                           |
+| `.TotalLinesRemoved`  | `int`        | Lines of code removed in the session                         |
 
 #### ContextWindow Properties
 
-| Name                 | Type           | Description                                  |
-| -------------------- | -------------- | -------------------------------------------- |
-| `.TotalInputTokens`  | `int`          | Total input tokens used in the session       |
-| `.TotalOutputTokens` | `int`          | Total output tokens generated in the session |
-| `.ContextWindowSize` | `int`          | Maximum context window size for the model    |
-| `.CurrentUsage`      | `CurrentUsage` | Current message token usage                  |
+| Name                   | Type           | Description                                                                |
+| ---------------------- | -------------- | -------------------------------------------------------------------------- |
+| `.UsedPercentage`      | `int`          | Used context percentage; nil before usage data is available                |
+| `.RemainingPercentage` | `int`          | Remaining context percentage; nil before usage data is available           |
+| `.CurrentUsage`        | `CurrentUsage` | Last API call token counts; nil before the first call and after `/compact` |
+| `.TotalInputTokens`    | `int`          | Input tokens in the current context, including cache reads and writes      |
+| `.TotalOutputTokens`   | `int`          | Output tokens from the most recent API response                            |
+| `.ContextWindowSize`   | `int`          | Maximum context window size for the model                                  |
 
 #### CurrentUsage Properties
 
-| Name            | Type  | Description                           |
-| --------------- | ----- | ------------------------------------- |
-| `.InputTokens`  | `int` | Input tokens for the current message  |
-| `.OutputTokens` | `int` | Output tokens for the current message |
+| Name                        | Type  | Description                                     |
+| --------------------------- | ----- | ----------------------------------------------- |
+| `.InputTokens`              | `int` | Input tokens in the current context             |
+| `.OutputTokens`             | `int` | Output tokens from the most recent API response |
+| `.CacheCreationInputTokens` | `int` | Input tokens written to the prompt cache        |
+| `.CacheReadInputTokens`     | `int` | Input tokens read from the prompt cache         |
 
 #### RateLimits Properties
 
 Available when Claude Code provides rate limit data (Pro/Max subscribers). Access via `.RateLimits`.
 
-| Name        | Type              | Description              |
-| ----------- | ----------------- | ------------------------ |
-| `.FiveHour` | `RateLimitWindow` | 5-hour rolling window    |
-| `.SevenDay` | `RateLimitWindow` | 7-day rolling window     |
+| Name        | Type              | Description                                      |
+| ----------- | ----------------- | ------------------------------------------------ |
+| `.FiveHour` | `RateLimitWindow` | 5-hour rolling window; nil when unavailable      |
+| `.SevenDay` | `RateLimitWindow` | 7-day rolling window; nil when unavailable       |
 
 #### RateLimitWindow Properties
 
-| Name              | Type       | Description                              |
-| ----------------- | ---------- | ---------------------------------------- |
-| `.UsedPercentage` | `*float64` | Usage percentage (0-100), nil if unknown |
-| `.ResetsAt`       | `*int64`   | Unix epoch seconds when window resets    |
+| Name              | Type      | Description                                            |
+| ----------------- | --------- | ------------------------------------------------------ |
+| `.UsedPercentage` | `float64` | Usage percentage from 0 to 100; nil when unavailable   |
+| `.ResetsAt`       | `int64`   | Reset time as Unix epoch seconds; nil when unavailable |
 
 ### Percentage Methods
 

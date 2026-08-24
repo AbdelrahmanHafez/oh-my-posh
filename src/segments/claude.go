@@ -91,6 +91,7 @@ type ClaudePR struct {
 	Number      json.Number `json:"number"`
 	URL         string      `json:"url"`
 	ReviewState string      `json:"review_state"`
+	Kind        string      `json:"kind"`
 }
 
 // Nil when the session is not running inside a Claude Code worktree.
