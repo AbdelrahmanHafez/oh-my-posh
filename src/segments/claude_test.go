@@ -371,6 +371,26 @@ func TestClaudeAdditionalStatusLineFieldsJSONShape(t *testing.T) {
 			ExpectedAddedDirsNil: true,
 		},
 		{
+			Case: "GitLab merge request",
+			JSON: `{
+				"pr": {
+					"number": 321,
+					"url": "https://gitlab.com/acme/widgets/-/merge_requests/321",
+					"review_state": "approved",
+					"kind": "mr"
+				}
+			}`,
+			Expected: ClaudeData{
+				PR: &ClaudePR{
+					Number:      json.Number("321"),
+					URL:         "https://gitlab.com/acme/widgets/-/merge_requests/321",
+					ReviewState: "approved",
+					Kind:        "mr",
+				},
+			},
+			ExpectedAddedDirsNil: true,
+		},
+		{
 			Case: "PR number provided as string",
 			JSON: `{"pr":{"number":"1234"}}`,
 			Expected: ClaudeData{
