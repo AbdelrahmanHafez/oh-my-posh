@@ -38,7 +38,7 @@ import Config from "@site/src/components/Config.js";
     foreground: "#FFFFFF",
     background: "#FF6B35",
     template:
-      " \udb82\udfc9 {{ .Model.DisplayName }} \uf2d0 {{ .TokenGauge }} ",
+      " \udb82\udfc9 {{ .Model.DisplayName }} \uf2d0 {{ .TokenGauge }} "
   }}
 />
 
@@ -61,42 +61,48 @@ import Config from "@site/src/components/Config.js";
 
 ### Properties
 
-| Name                    | Type            | Description                                                                          |
-| ----------------------- | --------------- | ------------------------------------------------------------------------------------ |
-| `.CWD`                  | `string`        | Current working directory; same value as `.Workspace.CurrentDir`                     |
-| `.SessionID`            | `string`        | Unique identifier for the Claude session                                             |
-| `.SessionName`          | `string`        | Custom session name; empty when absent                                               |
-| `.PromptID`             | `string`        | User prompt identifier for event correlation; empty when absent                      |
-| `.TranscriptPath`       | `string`        | Path to the conversation transcript file                                             |
-| `.Model`                | `Model`         | AI model information                                                                 |
-| `.Workspace`            | `Workspace`     | Workspace directory information                                                      |
-| `.Version`              | `string`        | Claude Code version                                                                  |
-| `.OutputStyle`          | `OutputStyle`   | Current output style information; nil when absent                                   |
-| `.Effort`               | `Effort`        | Reasoning effort information; nil when absent or unsupported                         |
-| `.Thinking`             | `Thinking`      | Extended thinking state; nil when absent                                            |
-| `.Cost`                 | `Cost`          | Cost and duration information                                                        |
-| `.ContextWindow`        | `ContextWindow` | Token usage information                                                              |
-| `.Exceeds200KTokens`    | `bool`          | Whether the most recent API response exceeded 200K total tokens                      |
-| `.Vim`                  | `Vim`           | Vim mode information; nil when absent                                                |
-| `.Agent`                | `Agent`         | Agent information; nil when absent                                                   |
-| `.PR`                   | `PR`            | Pull request information for the current branch; nil when absent                     |
-| `.Worktree`             | `Worktree`      | Claude Code worktree information; nil when absent                                    |
-| `.FastMode`             | `bool`          | Whether fast mode is enabled; `false` when absent or unsupported                     |
-| `.TokenUsagePercent`    | `Percentage`    | Percentage of context window used (0-100)                                            |
-| `.TokenGauge`           | `string`        | Gauge showing remaining context capacity using configured characters (e.g., `▰▰▰▱▱`) |
-| `.TokenGaugeUsed`       | `string`        | Gauge showing used context capacity using configured characters (e.g., `▰▰▱▱▱`)      |
-| `.FiveHourGauge`        | `string`        | Gauge showing 5-hour rate limit usage using configured characters                    |
-| `.SevenDayGauge`        | `string`        | Gauge showing 7-day rate limit usage using configured characters                     |
-| `.FiveHourResetsAt`     | `time.Time`     | 5-hour rate limit window reset time                                                  |
-| `.SevenDayResetsAt`     | `time.Time`     | 7-day rate limit window reset time                                                   |
-| `.FiveHourResetsIn`     | `time.Duration` | time until 5-hour resets; 0=unavailable, neg=past                                    |
-| `.SevenDayResetsIn`     | `time.Duration` | time until 7-day resets; 0=unavailable, neg=past                                     |
-| `.FormattedCost`        | `string`        | Formatted cost string (e.g., "$0.15" or "$0.0012")                                   |
-| `.FormattedTokens`      | `string`        | Human-readable token count (e.g., "1.2K", "15.3M")                                   |
-| `.FormattedDuration`    | `string`        | Total session duration (e.g., "2m 5s")                                               |
-| `.FormattedAPIDuration` | `string`        | API wait time (e.g., "0m 45s")                                                       |
-| `.FiveHourUsage`        | `Percentage`    | 5-hour rolling rate limit usage (0-100)                                              |
-| `.SevenDayUsage`        | `Percentage`    | 7-day rate limit usage (0-100)                                                       |
+| Name                    | Type            | Description                                                      |
+| ----------------------- | --------------- | ---------------------------------------------------------------- |
+| `.CWD`                  | `string`        | Current working directory; matches `.Workspace.CurrentDir`       |
+| `.SessionID`            | `string`        | Unique identifier for the Claude session                         |
+| `.SessionName`          | `string`        | Custom session name; empty when absent                           |
+| `.PromptID`             | `string`        | Prompt identifier for event correlation; empty when absent       |
+| `.TranscriptPath`       | `string`        | Path to the conversation transcript file                         |
+| `.Model`                | `Model`         | AI model information                                             |
+| `.Workspace`            | `Workspace`     | Workspace directory information                                  |
+| `.Version`              | `string`        | Claude Code version                                              |
+| `.OutputStyle`          | `OutputStyle`   | Current output style information; nil when absent                |
+| `.Effort`               | `Effort`        | Reasoning effort information; nil when absent or unsupported     |
+| `.Thinking`             | `Thinking`      | Extended thinking state; nil when absent                         |
+| `.Cost`                 | `Cost`          | Cost and duration information                                    |
+| `.ContextWindow`        | `ContextWindow` | Token usage information                                          |
+| `.RateLimits`           | `RateLimits`    | Rate limit information; nil when absent                          |
+| `.PromptCache`          | `PromptCache`   | Prompt cache data; nil before the first main API response        |
+| `.Exceeds200KTokens`    | `bool`          | Whether the latest API response exceeded 200K total tokens       |
+| `.Vim`                  | `Vim`           | Vim mode information; nil when absent                            |
+| `.Agent`                | `Agent`         | Agent information; nil when absent                               |
+| `.PR`                   | `PR`            | Pull request information for the current branch; nil when absent |
+| `.Worktree`             | `Worktree`      | Claude Code worktree information; nil when absent                |
+| `.FastMode`             | `bool`          | Whether fast mode is enabled; `false` when absent or unsupported |
+| `.TokenUsagePercent`    | `Percentage`    | Context window usage percentage (0-100)                          |
+| `.TokenGauge`           | `string`        | Remaining context gauge, such as `▰▰▰▱▱`                         |
+| `.TokenGaugeUsed`       | `string`        | Used context gauge, such as `▰▰▱▱▱`                              |
+| `.FiveHourGauge`        | `string`        | Gauge for 5-hour rate limit usage                                |
+| `.SevenDayGauge`        | `string`        | Gauge for 7-day rate limit usage                                 |
+| `.SpendLimitGauge`      | `string`        | Gauge for spend limit usage                                      |
+| `.FiveHourResetsAt`     | `time.Time`     | 5-hour rate limit window reset time                              |
+| `.SevenDayResetsAt`     | `time.Time`     | 7-day rate limit window reset time                               |
+| `.SpendLimitResetsAt`   | `time.Time`     | Spend limit period reset time                                    |
+| `.FiveHourResetsIn`     | `time.Duration` | Time until 5-hour reset; zero unavailable, negative past         |
+| `.SevenDayResetsIn`     | `time.Duration` | Time until 7-day reset; zero unavailable, negative past          |
+| `.SpendLimitResetsIn`   | `time.Duration` | Time until spend limit reset; zero unavailable, negative past    |
+| `.FormattedCost`        | `string`        | Cost, such as `$0.15` or `$0.0012`                               |
+| `.FormattedTokens`      | `string`        | Token count, such as `1.2K` or `15.3M`                           |
+| `.FormattedDuration`    | `string`        | Total session duration, such as `2m 5s`                          |
+| `.FormattedAPIDuration` | `string`        | API wait time, such as `0m 45s`                                  |
+| `.FiveHourUsage`        | `Percentage`    | 5-hour rolling rate limit usage (0-100)                          |
+| `.SevenDayUsage`        | `Percentage`    | 7-day rate limit usage (0-100)                                   |
+| `.SpendLimitUsage`      | `Percentage`    | Spend limit usage; can exceed 100                                |
 
 #### Model Properties
 
@@ -124,7 +130,7 @@ import Config from "@site/src/components/Config.js";
 | `.Name`  | `string` | Repository name; empty when absent                           |
 
 :::tip nil pointer fields
-`.OutputStyle`, `.Effort`, `.Thinking`, `.Vim`, `.Agent`, `.PR`, `.Worktree`, and `.Workspace.Repo`
+`.OutputStyle`, `.Effort`, `.Thinking`, `.Vim`, `.Agent`, `.PR`, `.Worktree`, `.PromptCache`, and `.Workspace.Repo`
 are all `nil` when the underlying data is absent. Guard direct field access with
 `{{if .Effort}}{{.Effort.Level}}{{end}}` to avoid template errors.
 :::
@@ -137,9 +143,11 @@ are all `nil` when the underlying data is absent. Guard direct field access with
 
 #### Effort Properties
 
-| Name     | Type     | Description                                                                                        |
-| -------- | -------- | -------------------------------------------------------------------------------------------------- |
-| `.Level` | `string` | Reasoning effort level (`low`, `medium`, `high`, `xhigh`, `max`); empty when absent or unsupported |
+| Name     | Type     | Description                                    |
+| -------- | -------- | ---------------------------------------------- |
+| `.Level` | `string` | Effort level; empty when absent or unsupported |
+
+The effort level can be `low`, `medium`, `high`, `xhigh`, or `max`.
 
 #### Thinking Properties
 
@@ -161,11 +169,13 @@ are all `nil` when the underlying data is absent. Guard direct field access with
 
 #### PR Properties
 
-| Name           | Type          | Description                                                                                   |
-| -------------- | ------------- | --------------------------------------------------------------------------------------------- |
-| `.Number`      | `string`      | Open pull request number for the current branch; empty when absent                            |
-| `.URL`         | `string`      | Open pull request URL for the current branch; empty when absent                               |
-| `.ReviewState` | `string`      | Review status (`approved`, `pending`, `changes_requested`, or `draft`); empty when unavailable |
+| Name           | Type     | Description                            |
+| -------------- | -------- | -------------------------------------- |
+| `.Number`      | `string` | Pull request number; empty when absent |
+| `.URL`         | `string` | Pull request URL; empty when absent    |
+| `.ReviewState` | `string` | Review state; empty when unavailable   |
+
+The review state can be `approved`, `pending`, `changes_requested`, or `draft`.
 
 #### Worktree Properties
 
@@ -179,13 +189,15 @@ are all `nil` when the underlying data is absent. Guard direct field access with
 
 #### Cost Properties
 
-| Name                  | Type         | Description                                                 |
-| --------------------- | ------------ | ----------------------------------------------------------- |
-| `.TotalCostUSD`       | `float64`    | Total cost in USD                                           |
-| `.TotalDurationMS`    | `DurationMS` | Total session duration in milliseconds (formats as "Xm Ys") |
-| `.TotalAPIDurationMS` | `DurationMS` | Time spent waiting for API responses (formats as "Xm Ys")   |
-| `.TotalLinesAdded`    | `int`        | Lines of code added in the session                          |
-| `.TotalLinesRemoved`  | `int`        | Lines of code removed in the session                        |
+| Name                  | Type         | Description                  |
+| --------------------- | ------------ | ---------------------------- |
+| `.TotalCostUSD`       | `float64`    | Total cost in USD            |
+| `.TotalDurationMS`    | `DurationMS` | Total session duration       |
+| `.TotalAPIDurationMS` | `DurationMS` | Time spent on API responses  |
+| `.TotalLinesAdded`    | `int`        | Lines added in the session   |
+| `.TotalLinesRemoved`  | `int`        | Lines removed in the session |
+
+`DurationMS` renders as `Xm Ys`, such as `2m 5s`.
 
 #### ContextWindow Properties
 
@@ -203,45 +215,68 @@ are all `nil` when the underlying data is absent. Guard direct field access with
 | `.InputTokens`  | `int` | Input tokens for the current message  |
 | `.OutputTokens` | `int` | Output tokens for the current message |
 
+#### PromptCache Properties
+
+The prompt cache object appears after the main conversation's first API response. It does not include subagent requests.
+
+| Name                   | Type       | Description                                                |
+| ---------------------- | ---------- | ---------------------------------------------------------- |
+| `.Warm`                | `bool`     | Whether the cached prefix is still within its TTL          |
+| `.CachingObserved`     | `bool`     | Whether a response reported prompt cache tokens            |
+| `.TTL`                 | `string`   | Cache lifetime for the current prefix, either `5m` or `1h` |
+| `.ExpiresAt`           | `*int64`   | Cache expiry in epoch seconds; nil when cold               |
+| `.Requests`            | `int`      | Main conversation API requests in this session             |
+| `.Misses`              | `int`      | Requests that unexpectedly rebuilt cached content          |
+| `.ExpectedRebuilds`    | `int`      | Rebuilds caused by compaction or tool result clearing      |
+| `.HitRatio`            | `*float64` | Cache read ratio; nil when no input exists                 |
+| `.CacheWriteTokens`    | `int`      | Tokens written to the cache in this session                |
+| `.MissRecacheTokens`   | `int`      | Tokens written by requests counted as misses               |
+| `.LastMissAt`          | `*int64`   | Last miss in epoch seconds; nil when no miss exists        |
+| `.RecacheTokensIfCold` | `*int`     | Tokens the next request will recache; nil when unknown     |
+
 #### RateLimits Properties
 
-Available when Claude Code provides rate limit data (Pro/Max subscribers). Access via `.RateLimits`.
+Available for Pro and Max subscribers. It is also available through a Claude apps gateway with spend limits.
+Each window can be nil. Claude Code removes a window after its reset time passes.
 
-| Name        | Type              | Description              |
-| ----------- | ----------------- | ------------------------ |
-| `.FiveHour` | `RateLimitWindow` | 5-hour rolling window    |
-| `.SevenDay` | `RateLimitWindow` | 7-day rolling window     |
+| Name          | Type              | Description                         |
+| ------------- | ----------------- | ----------------------------------- |
+| `.FiveHour`   | `RateLimitWindow` | 5-hour rolling window               |
+| `.SevenDay`   | `RateLimitWindow` | 7-day rolling window                |
+| `.SpendLimit` | `RateLimitWindow` | Spend limit period; nil when absent |
 
 #### RateLimitWindow Properties
 
-| Name              | Type       | Description                              |
-| ----------------- | ---------- | ---------------------------------------- |
-| `.UsedPercentage` | `*float64` | Usage percentage (0-100), nil if unknown |
-| `.ResetsAt`       | `*int64`   | Unix epoch seconds when window resets    |
+| Name              | Type       | Description                                                   |
+| ----------------- | ---------- | ------------------------------------------------------------- |
+| `.UsedPercentage` | `*float64` | Usage percentage; spend limits can exceed 100; nil if unknown |
+| `.ResetsAt`       | `*int64`   | Unix epoch seconds when the window resets                     |
 
 ### Percentage Methods
 
-The `Percentage` type (returned by `.TokenUsagePercent`, `.FiveHourUsage`, `.SevenDayUsage`)
+The `Percentage` type (returned by `.TokenUsagePercent`, `.FiveHourUsage`, `.SevenDayUsage`, `.SpendLimitUsage`)
 provides additional methods for direct use in templates:
 
-| Method       | Returns  | Description                                                        |
-| ------------ | -------- | ------------------------------------------------------------------ |
+| Method       | Returns  | Description                                                                |
+| ------------ | -------- | -------------------------------------------------------------------------- |
 | `.Gauge`     | `string` | Visual gauge showing remaining capacity using hardcoded `▰`/`▱` characters |
-| `.GaugeUsed` | `string` | Visual gauge showing used capacity using hardcoded `▰`/`▱` characters |
-| `.String`    | `string` | Numeric percentage value (e.g., "75" for use in templates)         |
+| `.GaugeUsed` | `string` | Visual gauge showing used capacity using hardcoded `▰`/`▱` characters      |
+| `.String`    | `string` | Numeric percentage value (e.g., "75" for use in templates)                 |
 
 :::tip Custom gauge characters
-Use `.TokenGauge`, `.TokenGaugeUsed`, `.FiveHourGauge`, and `.SevenDayGauge` instead of the
-raw `.Percentage` methods above — they respect the `gauge_marked_char` and `gauge_unmarked_char` options.
+Use `.TokenGauge`, `.TokenGaugeUsed`, `.FiveHourGauge`, `.SevenDayGauge`, and `.SpendLimitGauge` instead of the
+raw `.Percentage` methods above. They respect the `gauge_marked_char` and `gauge_unmarked_char` options.
 :::
 
 ## How it works
 
-The segment reads session information from the `POSH_CLAUDE_STATUS` environment variable, which is automatically set when using the `oh-my-posh claude` command. The data includes:
+The segment reads session information from the `POSH_CLAUDE_STATUS` environment variable.
+The `oh-my-posh claude` command sets this variable. The data includes:
 
 - Current AI model information
 - Token usage and context window utilization
 - Session costs and duration
+- Prompt cache and rate limit usage
 - Workspace directory information
 
 The segment only displays when Claude Code is actively providing session data.

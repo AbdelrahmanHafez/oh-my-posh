@@ -24,6 +24,7 @@ type ClaudeData struct {
 	OutputStyle       *ClaudeOutputStyle  `json:"output_style"`
 	Vim               *ClaudeVim          `json:"vim"`
 	RateLimits        *ClaudeRateLimits   `json:"rate_limits"`
+	PromptCache       *ClaudePromptCache  `json:"prompt_cache"`
 	Thinking          *ClaudeThinking     `json:"thinking"`
 	PR                *ClaudePR           `json:"pr"`
 	Agent             *ClaudeAgent        `json:"agent"`
@@ -126,8 +127,24 @@ type ClaudeRateLimitWindow struct {
 }
 
 type ClaudeRateLimits struct {
-	FiveHour *ClaudeRateLimitWindow `json:"five_hour"`
-	SevenDay *ClaudeRateLimitWindow `json:"seven_day"`
+	FiveHour   *ClaudeRateLimitWindow `json:"five_hour"`
+	SevenDay   *ClaudeRateLimitWindow `json:"seven_day"`
+	SpendLimit *ClaudeRateLimitWindow `json:"spend_limit"`
+}
+
+type ClaudePromptCache struct {
+	ExpiresAt           *int64   `json:"expires_at"`
+	LastMissAt          *int64   `json:"last_miss_at"`
+	HitRatio            *float64 `json:"hit_ratio"`
+	RecacheTokensIfCold *int     `json:"recache_tokens_if_cold"`
+	TTL                 string   `json:"ttl"`
+	Requests            int      `json:"requests"`
+	Misses              int      `json:"misses"`
+	ExpectedRebuilds    int      `json:"expected_rebuilds"`
+	CacheWriteTokens    int      `json:"cache_write_tokens"`
+	MissRecacheTokens   int      `json:"miss_recache_tokens"`
+	Warm                bool     `json:"warm"`
+	CachingObserved     bool     `json:"caching_observed"`
 }
 
 type ClaudeContextWindow struct {
@@ -258,6 +275,10 @@ func (c *Claude) SevenDayGauge() string {
 	return c.SevenDayUsage().GaugeUsedWith(c.markedChar, c.unmarkedChar)
 }
 
+func (c *Claude) SpendLimitGauge() string {
+	return c.SpendLimitUsage().GaugeUsedWith(c.markedChar, c.unmarkedChar)
+}
+
 func (c *Claude) FormattedCost() string {
 	if c.Cost.TotalCostUSD < 0.01 {
 		return fmt.Sprintf("$%.4f", c.Cost.TotalCostUSD)
@@ -275,6 +296,15 @@ func (c *Claude) FormattedAPIDuration() string {
 }
 
 func rateLimitPercentage(limits *ClaudeRateLimits, window func(*ClaudeRateLimits) *ClaudeRateLimitWindow) text.Percentage {
+	percent := uncappedRateLimitPercentage(limits, window)
+	if percent > 100 {
+		return 100
+	}
+
+	return percent
+}
+
+func uncappedRateLimitPercentage(limits *ClaudeRateLimits, window func(*ClaudeRateLimits) *ClaudeRateLimitWindow) text.Percentage {
 	if limits == nil {
 		return 0
 	}
@@ -284,12 +314,7 @@ func rateLimitPercentage(limits *ClaudeRateLimits, window func(*ClaudeRateLimits
 		return 0
 	}
 
-	percent := int(*w.UsedPercentage + 0.5)
-	if percent > 100 {
-		return 100
-	}
-
-	return text.Percentage(percent)
+	return text.Percentage(int(*w.UsedPercentage + 0.5))
 }
 
 func (c *Claude) FiveHourUsage() text.Percentage {
@@ -301,6 +326,12 @@ func (c *Claude) FiveHourUsage() text.Percentage {
 func (c *Claude) SevenDayUsage() text.Percentage {
 	return rateLimitPercentage(c.RateLimits, func(r *ClaudeRateLimits) *ClaudeRateLimitWindow {
 		return r.SevenDay
+	})
+}
+
+func (c *Claude) SpendLimitUsage() text.Percentage {
+	return uncappedRateLimitPercentage(c.RateLimits, func(r *ClaudeRateLimits) *ClaudeRateLimitWindow {
+		return r.SpendLimit
 	})
 }
 
@@ -329,6 +360,12 @@ func (c *Claude) SevenDayResetsAt() time.Time {
 	})
 }
 
+func (c *Claude) SpendLimitResetsAt() time.Time {
+	return rateLimitResetsAt(c.RateLimits, func(r *ClaudeRateLimits) *ClaudeRateLimitWindow {
+		return r.SpendLimit
+	})
+}
+
 // Returns 0 when data is unavailable, negative when the window already reset, positive otherwise.
 func rateLimitResetsIn(limits *ClaudeRateLimits, window func(*ClaudeRateLimits) *ClaudeRateLimitWindow) time.Duration {
 	t := rateLimitResetsAt(limits, window)
@@ -348,6 +385,12 @@ func (c *Claude) FiveHourResetsIn() time.Duration {
 func (c *Claude) SevenDayResetsIn() time.Duration {
 	return rateLimitResetsIn(c.RateLimits, func(r *ClaudeRateLimits) *ClaudeRateLimitWindow {
 		return r.SevenDay
+	})
+}
+
+func (c *Claude) SpendLimitResetsIn() time.Duration {
+	return rateLimitResetsIn(c.RateLimits, func(r *ClaudeRateLimits) *ClaudeRateLimitWindow {
+		return r.SpendLimit
 	})
 }
 
