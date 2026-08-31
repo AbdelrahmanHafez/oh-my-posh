@@ -323,6 +323,26 @@ func TestClaudeAdditionalStatusLineFieldsJSONShape(t *testing.T) {
 					"original_cwd": "/repo/project",
 					"original_branch": "main"
 				},
+				"prompt_cache": {
+					"warm": true,
+					"caching_observed": true,
+					"ttl": "1h",
+					"expires_at": 1738429200,
+					"requests": 14,
+					"misses": 2,
+					"expected_rebuilds": 1,
+					"hit_ratio": 0.91,
+					"cache_write_tokens": 352000,
+					"miss_recache_tokens": 310200,
+					"last_miss_at": 1738425230,
+					"recache_tokens_if_cold": 45000
+				},
+				"rate_limits": {
+					"spend_limit": {
+						"used_percentage": 62.8,
+						"resets_at": 1740787200
+					}
+				},
 				"fast_mode": true
 			}`,
 			Expected: ClaudeData{
@@ -355,6 +375,26 @@ func TestClaudeAdditionalStatusLineFieldsJSONShape(t *testing.T) {
 					OriginalCWD:    "/repo/project",
 					OriginalBranch: originalBranchName,
 				},
+				PromptCache: &ClaudePromptCache{
+					Warm:                true,
+					CachingObserved:     true,
+					TTL:                 "1h",
+					ExpiresAt:           new(int64(1738429200)),
+					Requests:            14,
+					Misses:              2,
+					ExpectedRebuilds:    1,
+					HitRatio:            new(0.91),
+					CacheWriteTokens:    352000,
+					MissRecacheTokens:   310200,
+					LastMissAt:          new(int64(1738425230)),
+					RecacheTokensIfCold: new(45000),
+				},
+				RateLimits: &ClaudeRateLimits{
+					SpendLimit: &ClaudeRateLimitWindow{
+						UsedPercentage: new(62.8),
+						ResetsAt:       new(int64(1740787200)),
+					},
+				},
 				FastMode: true,
 			},
 		},
@@ -386,7 +426,11 @@ func TestClaudeAdditionalStatusLineFieldsJSONShape(t *testing.T) {
 				"vim": {},
 				"agent": {},
 				"pr": {},
-				"worktree": {}
+				"worktree": {},
+				"prompt_cache": {},
+				"rate_limits": {
+					"spend_limit": {}
+				}
 			}`,
 			Expected: ClaudeData{
 				OutputStyle: &ClaudeOutputStyle{},
@@ -394,6 +438,10 @@ func TestClaudeAdditionalStatusLineFieldsJSONShape(t *testing.T) {
 				Agent:       &ClaudeAgent{},
 				PR:          &ClaudePR{},
 				Worktree:    &ClaudeWorktree{},
+				PromptCache: &ClaudePromptCache{},
+				RateLimits: &ClaudeRateLimits{
+					SpendLimit: &ClaudeRateLimitWindow{},
+				},
 			},
 			ExpectedAddedDirsNil: true,
 		},
@@ -453,6 +501,8 @@ func TestClaudeAdditionalStatusLineFieldsJSONShape(t *testing.T) {
 		assert.Equal(t, tc.Expected.Workspace.Repo, data.Workspace.Repo, tc.Case)
 		assert.Equal(t, tc.Expected.PR, data.PR, tc.Case)
 		assert.Equal(t, tc.Expected.Worktree, data.Worktree, tc.Case)
+		assert.Equal(t, tc.Expected.PromptCache, data.PromptCache, tc.Case)
+		assert.Equal(t, tc.Expected.RateLimits, data.RateLimits, tc.Case)
 		assert.Equal(t, tc.Expected.FastMode, data.FastMode, tc.Case)
 	}
 }
@@ -763,10 +813,11 @@ func TestClaudeFormattedTokens(t *testing.T) {
 
 func TestClaudeRateLimitUsage(t *testing.T) {
 	cases := []struct {
-		RateLimits    *ClaudeRateLimits
-		Case          string
-		ExpectedFive  text.Percentage
-		ExpectedSeven text.Percentage
+		RateLimits         *ClaudeRateLimits
+		Case               string
+		ExpectedFive       text.Percentage
+		ExpectedSeven      text.Percentage
+		ExpectedSpendLimit text.Percentage
 	}{
 		{
 			Case:          "Nil RateLimits",
@@ -793,38 +844,46 @@ func TestClaudeRateLimitUsage(t *testing.T) {
 		{
 			Case: "Nil UsedPercentage",
 			RateLimits: &ClaudeRateLimits{
-				FiveHour: &ClaudeRateLimitWindow{UsedPercentage: nil},
-				SevenDay: &ClaudeRateLimitWindow{UsedPercentage: nil},
+				FiveHour:   &ClaudeRateLimitWindow{UsedPercentage: nil},
+				SevenDay:   &ClaudeRateLimitWindow{UsedPercentage: nil},
+				SpendLimit: &ClaudeRateLimitWindow{UsedPercentage: nil},
 			},
-			ExpectedFive:  0,
-			ExpectedSeven: 0,
+			ExpectedFive:       0,
+			ExpectedSeven:      0,
+			ExpectedSpendLimit: 0,
 		},
 		{
 			Case: "Valid percentages",
 			RateLimits: &ClaudeRateLimits{
-				FiveHour: &ClaudeRateLimitWindow{UsedPercentage: new(42.7)},
-				SevenDay: &ClaudeRateLimitWindow{UsedPercentage: new(75.3)},
+				FiveHour:   &ClaudeRateLimitWindow{UsedPercentage: new(42.7)},
+				SevenDay:   &ClaudeRateLimitWindow{UsedPercentage: new(75.3)},
+				SpendLimit: &ClaudeRateLimitWindow{UsedPercentage: new(62.8)},
 			},
-			ExpectedFive:  43,
-			ExpectedSeven: 75,
+			ExpectedFive:       43,
+			ExpectedSeven:      75,
+			ExpectedSpendLimit: 63,
 		},
 		{
-			Case: "Value over 100 capped",
+			Case: "Subscription usage capped and spend limit preserved over 100",
 			RateLimits: &ClaudeRateLimits{
-				FiveHour: &ClaudeRateLimitWindow{UsedPercentage: new(150.0)},
-				SevenDay: &ClaudeRateLimitWindow{UsedPercentage: new(200.0)},
+				FiveHour:   &ClaudeRateLimitWindow{UsedPercentage: new(150.0)},
+				SevenDay:   &ClaudeRateLimitWindow{UsedPercentage: new(200.0)},
+				SpendLimit: &ClaudeRateLimitWindow{UsedPercentage: new(125.0)},
 			},
-			ExpectedFive:  100,
-			ExpectedSeven: 100,
+			ExpectedFive:       100,
+			ExpectedSeven:      100,
+			ExpectedSpendLimit: 125,
 		},
 		{
 			Case: "Zero percentages",
 			RateLimits: &ClaudeRateLimits{
-				FiveHour: &ClaudeRateLimitWindow{UsedPercentage: new(0.0)},
-				SevenDay: &ClaudeRateLimitWindow{UsedPercentage: new(0.0)},
+				FiveHour:   &ClaudeRateLimitWindow{UsedPercentage: new(0.0)},
+				SevenDay:   &ClaudeRateLimitWindow{UsedPercentage: new(0.0)},
+				SpendLimit: &ClaudeRateLimitWindow{UsedPercentage: new(0.0)},
 			},
-			ExpectedFive:  0,
-			ExpectedSeven: 0,
+			ExpectedFive:       0,
+			ExpectedSeven:      0,
+			ExpectedSpendLimit: 0,
 		},
 	}
 
@@ -834,20 +893,22 @@ func TestClaudeRateLimitUsage(t *testing.T) {
 
 		assert.Equal(t, tc.ExpectedFive, claude.FiveHourUsage(), tc.Case+" (FiveHour)")
 		assert.Equal(t, tc.ExpectedSeven, claude.SevenDayUsage(), tc.Case+" (SevenDay)")
+		assert.Equal(t, tc.ExpectedSpendLimit, claude.SpendLimitUsage(), tc.Case+" (SpendLimit)")
 	}
 }
 
 func TestClaudeGaugeMethods(t *testing.T) {
 	cases := []struct {
-		RateLimits             *ClaudeRateLimits
-		Case                   string
-		MarkedChar             string
-		UnmarkedChar           string
-		ExpectedTokenGauge     string
-		ExpectedTokenGaugeUsed string
-		ExpectedFiveHourGauge  string
-		ExpectedSevenDayGauge  string
-		UsedPercentage         int
+		RateLimits              *ClaudeRateLimits
+		Case                    string
+		MarkedChar              string
+		UnmarkedChar            string
+		ExpectedTokenGauge      string
+		ExpectedTokenGaugeUsed  string
+		ExpectedFiveHourGauge   string
+		ExpectedSevenDayGauge   string
+		ExpectedSpendLimitGauge string
+		UsedPercentage          int
 	}{
 		{
 			Case:                   "Default chars (▰▱) at 40% used",
@@ -871,11 +932,13 @@ func TestClaudeGaugeMethods(t *testing.T) {
 			UnmarkedChar:   "░",
 			UsedPercentage: 0,
 			RateLimits: &ClaudeRateLimits{
-				FiveHour: &ClaudeRateLimitWindow{UsedPercentage: new(60.0)},
-				SevenDay: &ClaudeRateLimitWindow{UsedPercentage: new(20.0)},
+				FiveHour:   &ClaudeRateLimitWindow{UsedPercentage: new(60.0)},
+				SevenDay:   &ClaudeRateLimitWindow{UsedPercentage: new(20.0)},
+				SpendLimit: &ClaudeRateLimitWindow{UsedPercentage: new(125.0)},
 			},
-			ExpectedFiveHourGauge: "███░░", // 60% used = 3 blocks
-			ExpectedSevenDayGauge: "█░░░░", // 20% used = 1 block
+			ExpectedFiveHourGauge:   "███░░", // 60% used = 3 blocks
+			ExpectedSevenDayGauge:   "█░░░░", // 20% used = 1 block
+			ExpectedSpendLimitGauge: "█████",
 		},
 	}
 
@@ -903,6 +966,10 @@ func TestClaudeGaugeMethods(t *testing.T) {
 
 			if tc.ExpectedSevenDayGauge != "" {
 				assert.Equal(t, tc.ExpectedSevenDayGauge, claude.SevenDayGauge(), tc.Case+" (SevenDayGauge)")
+			}
+
+			if tc.ExpectedSpendLimitGauge != "" {
+				assert.Equal(t, tc.ExpectedSpendLimitGauge, claude.SpendLimitGauge(), tc.Case+" (SpendLimitGauge)")
 			}
 		})
 	}
@@ -932,14 +999,16 @@ func TestClaudeGaugeOptionsReadInEnabled(t *testing.T) {
 }
 
 func TestClaudeRateLimitResetsAt(t *testing.T) {
-	fiveHourTS := int64(1711180800) // 2024-03-23 08:00:00 UTC
-	sevenDayTS := int64(1711612800) // 2024-03-28 08:00:00 UTC
+	fiveHourTS := int64(1711180800)   // 2024-03-23 08:00:00 UTC
+	sevenDayTS := int64(1711612800)   // 2024-03-28 08:00:00 UTC
+	spendLimitTS := int64(1740787200) // 2025-03-01 00:00:00 UTC
 
 	cases := []struct {
-		ExpectedFiveHour libtime.Time
-		ExpectedSevenDay libtime.Time
-		RateLimits       *ClaudeRateLimits
-		Case             string
+		ExpectedFiveHour   libtime.Time
+		ExpectedSevenDay   libtime.Time
+		ExpectedSpendLimit libtime.Time
+		RateLimits         *ClaudeRateLimits
+		Case               string
 	}{
 		{
 			Case:             "Nil RateLimits",
@@ -966,20 +1035,24 @@ func TestClaudeRateLimitResetsAt(t *testing.T) {
 		{
 			Case: "Nil ResetsAt pointers",
 			RateLimits: &ClaudeRateLimits{
-				FiveHour: &ClaudeRateLimitWindow{ResetsAt: nil},
-				SevenDay: &ClaudeRateLimitWindow{ResetsAt: nil},
+				FiveHour:   &ClaudeRateLimitWindow{ResetsAt: nil},
+				SevenDay:   &ClaudeRateLimitWindow{ResetsAt: nil},
+				SpendLimit: &ClaudeRateLimitWindow{ResetsAt: nil},
 			},
-			ExpectedFiveHour: libtime.Time{},
-			ExpectedSevenDay: libtime.Time{},
+			ExpectedFiveHour:   libtime.Time{},
+			ExpectedSevenDay:   libtime.Time{},
+			ExpectedSpendLimit: libtime.Time{},
 		},
 		{
-			Case: "Valid timestamps for both windows",
+			Case: "Valid timestamps for all windows",
 			RateLimits: &ClaudeRateLimits{
-				FiveHour: &ClaudeRateLimitWindow{ResetsAt: &fiveHourTS},
-				SevenDay: &ClaudeRateLimitWindow{ResetsAt: &sevenDayTS},
+				FiveHour:   &ClaudeRateLimitWindow{ResetsAt: &fiveHourTS},
+				SevenDay:   &ClaudeRateLimitWindow{ResetsAt: &sevenDayTS},
+				SpendLimit: &ClaudeRateLimitWindow{ResetsAt: &spendLimitTS},
 			},
-			ExpectedFiveHour: libtime.Unix(fiveHourTS, 0),
-			ExpectedSevenDay: libtime.Unix(sevenDayTS, 0),
+			ExpectedFiveHour:   libtime.Unix(fiveHourTS, 0),
+			ExpectedSevenDay:   libtime.Unix(sevenDayTS, 0),
+			ExpectedSpendLimit: libtime.Unix(spendLimitTS, 0),
 		},
 	}
 
@@ -989,6 +1062,7 @@ func TestClaudeRateLimitResetsAt(t *testing.T) {
 
 		assert.Equal(t, tc.ExpectedFiveHour, claude.FiveHourResetsAt(), tc.Case+" (FiveHour)")
 		assert.Equal(t, tc.ExpectedSevenDay, claude.SevenDayResetsAt(), tc.Case+" (SevenDay)")
+		assert.Equal(t, tc.ExpectedSpendLimit, claude.SpendLimitResetsAt(), tc.Case+" (SpendLimit)")
 	}
 }
 
@@ -997,10 +1071,11 @@ func TestClaudeRateLimitResetsIn(t *testing.T) {
 	futureTS := libtime.Now().Add(24 * libtime.Hour).Unix()
 
 	cases := []struct {
-		RateLimits   *ClaudeRateLimits
-		Case         string
-		FiveHourSign int // -1=negative, 0=zero, 1=positive
-		SevenDaySign int
+		RateLimits     *ClaudeRateLimits
+		Case           string
+		FiveHourSign   int // -1=negative, 0=zero, 1=positive
+		SevenDaySign   int
+		SpendLimitSign int
 	}{
 		{
 			Case:         "Nil RateLimits",
@@ -1017,29 +1092,35 @@ func TestClaudeRateLimitResetsIn(t *testing.T) {
 		{
 			Case: "Nil ResetsAt",
 			RateLimits: &ClaudeRateLimits{
-				FiveHour: &ClaudeRateLimitWindow{},
-				SevenDay: &ClaudeRateLimitWindow{},
+				FiveHour:   &ClaudeRateLimitWindow{},
+				SevenDay:   &ClaudeRateLimitWindow{},
+				SpendLimit: &ClaudeRateLimitWindow{},
 			},
-			FiveHourSign: 0,
-			SevenDaySign: 0,
+			FiveHourSign:   0,
+			SevenDaySign:   0,
+			SpendLimitSign: 0,
 		},
 		{
 			Case: "Past timestamp",
 			RateLimits: &ClaudeRateLimits{
-				FiveHour: &ClaudeRateLimitWindow{ResetsAt: &pastTS},
-				SevenDay: &ClaudeRateLimitWindow{ResetsAt: &pastTS},
+				FiveHour:   &ClaudeRateLimitWindow{ResetsAt: &pastTS},
+				SevenDay:   &ClaudeRateLimitWindow{ResetsAt: &pastTS},
+				SpendLimit: &ClaudeRateLimitWindow{ResetsAt: &pastTS},
 			},
-			FiveHourSign: -1,
-			SevenDaySign: -1,
+			FiveHourSign:   -1,
+			SevenDaySign:   -1,
+			SpendLimitSign: -1,
 		},
 		{
 			Case: "Future timestamp",
 			RateLimits: &ClaudeRateLimits{
-				FiveHour: &ClaudeRateLimitWindow{ResetsAt: &futureTS},
-				SevenDay: &ClaudeRateLimitWindow{ResetsAt: &futureTS},
+				FiveHour:   &ClaudeRateLimitWindow{ResetsAt: &futureTS},
+				SevenDay:   &ClaudeRateLimitWindow{ResetsAt: &futureTS},
+				SpendLimit: &ClaudeRateLimitWindow{ResetsAt: &futureTS},
 			},
-			FiveHourSign: 1,
-			SevenDaySign: 1,
+			FiveHourSign:   1,
+			SevenDaySign:   1,
+			SpendLimitSign: 1,
 		},
 	}
 
@@ -1060,5 +1141,6 @@ func TestClaudeRateLimitResetsIn(t *testing.T) {
 		claude.RateLimits = tc.RateLimits
 		assertSign(t, claude.FiveHourResetsIn(), tc.FiveHourSign, tc.Case+" (FiveHour)")
 		assertSign(t, claude.SevenDayResetsIn(), tc.SevenDaySign, tc.Case+" (SevenDay)")
+		assertSign(t, claude.SpendLimitResetsIn(), tc.SpendLimitSign, tc.Case+" (SpendLimit)")
 	}
 }
